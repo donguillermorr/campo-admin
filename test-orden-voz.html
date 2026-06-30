@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Test — Orden por Voz</title>
+<style>
+body { font-family: Arial, sans-serif; padding: 40px; background: #f5f2ec; max-width: 600px; margin: 0 auto; }
+h2 { color: #2D5016; }
+.card { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.instruccion { background: #f0f7e8; border-radius: 8px; padding: 14px 18px; font-size: 13px; color: #2D5016; margin-bottom: 16px; line-height: 1.6; }
+.btn { background: #2D5016; color: #fff; border: none; border-radius: 8px;
+  padding: 14px 24px; font-size: 15px; cursor: pointer; font-family: inherit;
+  width: 100%; margin-top: 8px; font-weight: 600; transition: background .2s; }
+.btn:disabled { background: #aaa; cursor: default; }
+.btn:hover:not(:disabled) { background: #5A8A2A; }
+.btn-rojo { background: #C0392B; }
+.btn-rojo:hover:not(:disabled) { background: #E74C3C; }
+#micro-estado {
+  text-align: center; font-size: 28px; margin: 16px 0 8px;
+  min-height: 40px;
+}
+#transcripcion-box {
+  width: 100%; box-sizing: border-box;
+  border: 1px solid #ccc; border-radius: 8px;
+  padding: 12px; font-size: 14px; font-family: inherit;
+  min-height: 80px; resize: vertical;
+  margin-top: 8px;
+}
+.resultado { background: #f0f7e8; border-radius: 8px; padding: 16px;
+  border-left: 4px solid #2D5016; margin-top: 12px; display: none; }
+.resultado h4 { color: #2D5016; margin: 0 0 12px; }
+.campo { display: flex; gap: 10px; margin-bottom: 8px; font-size: 14px; align-items: flex-start; }
+.campo label { font-weight: 600; width: 130px; flex-shrink: 0; color: #555; padding-top: 2px; }
+.campo span { color: #1C1C1C; }
+.estado { font-size: 13px; color: #888; margin-top: 8px; min-height: 20px; text-align: center; }
+.pulso { animation: pulso 1s infinite; }
+@keyframes pulso { 0%,100%{opacity:1} 50%{opacity:.3} }
+</style>
+</head>
+<body>
+
+<h2>🎤 Test — Orden por voz</h2>
+
+<div class="card">
+  <div class="instruccion">
+    <strong>¿Cómo usarlo?</strong><br>
+    1. Hacé click en <strong>"Iniciar escucha"</strong><br>
+    2. Reproducí el audio de WhatsApp en tu computadora (el micrófono lo va a captar)<br>
+    3. Cuando termine, hacé click en <strong>"Detener"</strong><br>
+    4. Revisá la transcripción y hacé click en <strong>"Interpretar con IA"</strong>
+  </div>
+
+  <div id="micro-estado">🎙️</div>
+
+  <button class="btn" id="btn-iniciar" onclick="iniciarEscucha()">🎙️ Iniciar escucha</button>
+  <button class="btn btn-rojo" id="btn-detener" onclick="detenerEscucha()" disabled>⏹ Detener</button>
+
+  <div class="estado" id="estado">Listo para escuchar</div>
+
+  <label style="font-size:13px;font-weight:600;color:#555;display:block;margin-top:16px;margin-bottom:4px">
+    Transcripción (podés editarla antes de interpretar):
+  </label>
+  <textarea id="transcripcion-box" placeholder="La transcripción del audio aparecerá acá..."></textarea>
+
+  <button class="btn" id="btn-interpretar" onclick="interpretarTexto()" disabled style="margin-top:12px">
+    🤖 Interpretar con IA
+  </button>
+</div>
+
+<div class="card resultado" id="resultado">
+  <h4>📋 Orden de trabajo interpretada</h4>
+  <div class="campo"><label>Labor:</label><span id="r-labor">—</span></div>
+  <div class="campo"><label>Lote:</label><span id="r-lote">—</span></div>
+  <div class="campo"><label>Insumo:</label><span id="r-insumo">—</span></div>
+  <div class="campo"><label>Dosis:</label><span id="r-dosis">—</span></div>
+  <div class="campo"><label>Fecha:</label><span id="r-fecha">—</span></div>
+  <div class="campo"><label>Observaciones:</label><span id="r-obs">—</span></div>
+</div>
+
+<script>
+var reconocimiento = null;
+var transcripcionFinal = '';
+
+function iniciarEscucha() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    alert('Tu navegador no soporta reconocimiento de voz. Usá Chrome.');
+    return;
+  }
+
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  reconocimiento = new SR();
+  reconocimiento.lang = 'es-AR';
+  reconocimiento.continuous = true;
+  reconocimiento.interimResults = true;
+
+  transcripcionFinal = '';
+  document.getElementById('transcripcion-box').value = '';
+  document.getElementById('resultado').style.display = 'none';
+
+  reconocimiento.onstart = function() {
+    document.getElementById('micro-estado').textContent = '🔴';
+    document.getElementById('micro-estado').classList.add('pulso');
+    document.getElementById('estado').textContent = 'Escuchando... reproducí el audio ahora';
+    document.getElementById('btn-iniciar').disabled = true;
+    document.getElementById('btn-detener').disabled = false;
+    document.getElementById('btn-interpretar').disabled = true;
+  };
+
+  reconocimiento.onresult = function(e) {
+    var interim = '';
+    for (var i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) {
+        transcripcionFinal += e.results[i][0].transcript + ' ';
+      } else {
+        interim += e.results[i][0].transcript;
+      }
+    }
+    document.getElementById('transcripcion-box').value = transcripcionFinal + interim;
+  };
+
+  reconocimiento.onerror = function(e) {
+    document.getElementById('estado').textContent = '❌ Error: ' + e.error + '. Asegurate de dar permiso al micrófono.';
+    detenerEscucha();
+  };
+
+  reconocimiento.onend = function() {
+    document.getElementById('micro-estado').textContent = '✅';
+    document.getElementById('micro-estado').classList.remove('pulso');
+    document.getElementById('estado').textContent = 'Escucha finalizada. Revisá la transcripción.';
+    document.getElementById('btn-iniciar').disabled = false;
+    document.getElementById('btn-detener').disabled = true;
+    if (transcripcionFinal.trim()) {
+      document.getElementById('btn-interpretar').disabled = false;
+    }
+  };
+
+  reconocimiento.start();
+}
+
+function detenerEscucha() {
+  if (reconocimiento) reconocimiento.stop();
+}
+
+async function interpretarTexto() {
+  var texto = document.getElementById('transcripcion-box').value.trim();
+  if (!texto) { alert('No hay texto para interpretar.'); return; }
+
+  var btn = document.getElementById('btn-interpretar');
+  btn.disabled = true;
+  btn.textContent = '⏳ Interpretando...';
+  document.getElementById('estado').textContent = 'Enviando a Claude...';
+
+  try {
+    var response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: `Sos el asistente de Campo Admin, un sistema de gestión agropecuaria argentino.
+El siguiente texto es la transcripción de un mensaje de voz indicando una tarea del campo.
+
+Texto: "${texto}"
+
+Extraé la información y respondé SOLO en JSON sin markdown:
+{
+  "labor": "tipo de labor (Siembra / Pulverización Terrestre / Cosecha / Fertilización / Otro)",
+  "lote": "nombre del lote mencionado o null",
+  "insumo": "producto o insumo mencionado o null",
+  "dosis": "dosis o cantidad mencionada o null",
+  "fecha": "fecha mencionada o null",
+  "observaciones": "cualquier dato adicional relevante o null"
+}`
+        }]
+      })
+    });
+
+    var data = await response.json();
+    if (data.error) throw new Error(data.error.message);
+
+    var txt = data.content[0].text.replace(/```json|```/g, '').trim();
+    var r = JSON.parse(txt);
+
+    document.getElementById('r-labor').textContent  = r.labor   || '—';
+    document.getElementById('r-lote').textContent   = r.lote    || '—';
+    document.getElementById('r-insumo').textContent = r.insumo  || '—';
+    document.getElementById('r-dosis').textContent  = r.dosis   || '—';
+    document.getElementById('r-fecha').textContent  = r.fecha   || '—';
+    document.getElementById('r-obs').textContent    = r.observaciones || '—';
+
+    document.getElementById('resultado').style.display = 'block';
+    document.getElementById('estado').textContent = '✅ Interpretación completada.';
+
+  } catch(err) {
+    document.getElementById('estado').textContent = '❌ Error: ' + err.message;
+  }
+
+  btn.disabled = false;
+  btn.textContent = '🤖 Interpretar con IA';
+}
+</script>
+</body>
+</html>
